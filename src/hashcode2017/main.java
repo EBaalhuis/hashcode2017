@@ -4,6 +4,7 @@ import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
+import java.util.TreeSet;
 
 public class main {
 
@@ -19,6 +20,7 @@ public class main {
 	public static Request[] reqs;
 	public static Cache[] caches;
 	public static String outDir; 
+	public static Pair[][] pairs;
 
 	// variables for making output
 	public static BufferedWriter bw;
@@ -32,6 +34,9 @@ public class main {
 
 			// Solution method here
 			sol1(outDir);
+			
+			// Write output
+			writeOutput();
 			bw.close();
 
 			// Evaluate solution locally, if needed
@@ -44,8 +49,44 @@ public class main {
 
 	public static void sol1(String fileDir) throws IOException {
 		// Solution method goes here
-
-		writeOutput();
+		
+		// First make all pairs
+		TreeSet<Pair> set = new TreeSet<Pair>();
+		
+		int curId = 0;
+		for (Video v : videos) {
+			for (End e : ends) {
+				Pair p = new Pair(v, e, e.latC, curId);
+				pairs[v.id][e.id] = p;
+				curId++;
+				
+				// Set initial score for this pair
+				int best = e.latC;
+				int bestId = -1;
+				for (Cache c : caches) {
+					if (e.connect[c.id]) {
+						if (c.space >= v.size) {
+							if (e.lat[c.id] < best) {
+								best = e.lat[c.id];
+								bestId = c.id;
+							}
+						}
+					}
+				}
+				double score = (p.curLat - best) * p.cst;
+				p.score = score;
+				p.closest = caches[bestId];
+				
+				set.add(p);
+			}
+		}
+		
+		// Keep adding best video-cache pair
+		for (int i = 0; i < 1; i++) {
+			System.out.println("Placing video!");
+			Pair bestPair = set.last();
+			addVideo(bestPair.v, bestPair.closest);
+		}
 	}
 
 	public static long evaluateSolution(String fileDir) {
@@ -87,7 +128,7 @@ public class main {
 				lat[id] = curLat;
 			}
 
-			ends[i] = new End(i, lC, lat);
+			ends[i] = new End(i, lC, lat, nVideos);
 
 		}
 
@@ -99,6 +140,7 @@ public class main {
 			int endId = Integer.parseInt(split[1]);
 			int nr = Integer.parseInt(split[2]);
 			reqs[j] = new Request(j, vidId, endId, nr);
+			ends[endId].vidReqs[vidId] += nr;
 		}
 
 		// Caches
@@ -106,8 +148,49 @@ public class main {
 		for (int j = 0; j < nServers; j++) {
 			caches[j] = new Cache(j, cap);
 		}
+		
+		// Pairs
+		pairs = new Pair[nVideos][nEnds];
 
 		br.close();
+	}
+	
+	public static void addVideo(Video v, Cache c) {
+		c.addVideo(v);
+		
+		for (End e : ends) {
+			if (e.connect[c.id]) {
+				if (e.curLat[v.id] > e.lat[c.id]) {
+					pairs[v.id][e.id].curLat = e.lat[c.id];
+					e.curLat[v.id] = e.lat[c.id];
+				}
+				
+				for (int i = 0; i < nVideos; i++) {
+					// Update availability (scores)
+					Pair p = pairs[i][e.id]; // update this pair
+					
+					if (v.size > p.closest.space) {
+						// Recalc score and closest
+						int best = e.curLat[v.id];
+						int bestId = -1;
+						for (Cache c2 : caches) {
+							if (e.connect[c2.id]) {
+								if (c2.space >= v.size) {
+									if (e.lat[c2.id] < best) {
+										best = e.lat[c2.id];
+										bestId = c2.id;
+									}
+								}
+							}
+						}
+						double score = (p.curLat - best) * p.cst;
+						p.score = score;
+						p.closest = caches[bestId];
+					}
+				}
+			}
+		}
+		
 	}
 
 	public static void writeOutput() throws IOException {
@@ -116,14 +199,9 @@ public class main {
 			if (!caches[i].vids.isEmpty()) {
 				nLines++;
 				StringBuffer sb = new StringBuffer();
+				sb.append("i");
 				for (Video v : caches[i].vids) {
-					boolean flag = false;
-					if (flag) {
-						sb.append(" ");
-					} else {
-						flag = true;
-					}
-					sb.append(String.format("%d", v.id));
+					sb.append(String.format(" %d", v.id));
 				}
 				
 				writeLine(sb.toString());
