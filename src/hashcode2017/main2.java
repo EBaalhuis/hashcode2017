@@ -16,7 +16,7 @@ import java.util.Arrays;
 import java.util.HashSet;
 import java.util.TreeSet;
 
-public class main {
+public class main2 {
 
 	// Input instances
 	public static String[] instances = {  "videos_worth_spreading" };
@@ -77,6 +77,7 @@ public class main {
 			for (Request r : reqs) {
 				End e = ends[r.endId];
 				if (e.connect[c.id]) {
+					// Replace e.latC!!
 					long curProfit = (e.latC - e.lat[c.id]) * r.nr;
 					profit[r.vidId] += curProfit;
 				}
@@ -213,7 +214,7 @@ public class main {
 
 	public static void addVideo(Video v, Cache c) {
 		c.addVideo(v);
-
+		// Update ends!
 	}
 
 	public static void writeOutput() throws IOException {

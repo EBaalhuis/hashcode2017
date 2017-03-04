@@ -6,6 +6,9 @@ public class Cache {
 	
 	public int id, cap, space;
 	public ArrayList<Video> vids;
+	public long[] totalReqs;
+	public double[] avgLat;
+	
 	
 	
 	Cache(int _id, int _cap) {
