@@ -10,6 +10,7 @@ public class End {
 	public long[] vidReqs;
 	public int[] curLat;
 	public int closestCacheId;
+	public int[] curCache;
 	
 	End(int _id, int _latC, int[] _lat, int nVids) {
 		id = _id;
@@ -26,6 +27,8 @@ public class End {
 		vidReqs = new long[nVids];
 		curLat = new int[nVids];
 		Arrays.fill(curLat, latC);
+		curCache = new int[nVids];
+		Arrays.fill(curCache, -1);
 		
 		int lowest = Integer.MAX_VALUE;
 		int lowestInd = -1;
@@ -36,6 +39,8 @@ public class End {
 			}
 		}
 		closestCacheId = lowestInd;
+		
+	
 	}
 	
 	
