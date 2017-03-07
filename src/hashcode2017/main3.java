@@ -14,6 +14,7 @@ import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
+import java.util.Random;
 import java.util.concurrent.ThreadLocalRandom;
 
 public class main3 {
@@ -37,6 +38,7 @@ public class main3 {
 	public static int cacheCount = 0;
 	public static long[] cost;
 	public static double startTime;
+	public static double bestOverall = 0;
 
 	// variables for making output
 	public static BufferedWriter bw;
@@ -44,50 +46,69 @@ public class main3 {
 	public static void main(String[] args) throws IOException {
 		startTime = System.nanoTime();
 		for (String s : instances) {
-			String inputDir = "C:\\Users\\Erik\\git\\hashcode2017\\data\\" + s + ".in";
-			outDir = "C:\\Users\\Erik\\git\\hashcode2017\\src\\" + s + ".out";
+			String inputDir = "/home/erik/git/hashcode2017/data/" + s + ".in";
+			outDir = "/home/erik/git/hashcode2017/data/" + s + ".out";
 			readInput(inputDir);
-			initWriter(outDir);
 
 			// Solution method here
-			sol1(outDir);
+
+			// sol1(outDir);
+			loadOptimal();
 
 			// And then do it again
 			// Score on zoo: 501555
-//			for (int i = 0; i < 10; i++) {
-//				repeatSol1(i + 1);
-//			}
-			
-			// Do random refills
-			double prev = evaluateSolution();
-			double best = 0;
-			
-			for (int i = 0; i < 100000; i++) {
-				double result = evaluateSolution();
-				if (result > best) {
-					best = result;
-				}
-				
-				System.err.printf("Result for instance is now %s: ", s);
-				System.err.printf("%.0f\n", Math.floor(result));
-				
-				refillRandom(2);
+			double cur = 0;
+			double updated = 1;
+			int count = 0;
+			while (cur != updated) {
+				count++;
+				cur = evaluateSolution();
+				repeatSol1(count);
+				double res = evaluateSolution();
+				System.out.printf("Result for instance is now %s: ", s);
+				System.out.printf("%.0f\n", Math.floor(res));
+				updated = evaluateSolution();
 			}
 
-			System.err.printf("Best found: %.0f\n", best);
+			// Do random refills
+			double best = 0;
+
+			for (int nCachesRefill = 2; nCachesRefill < 10; nCachesRefill++) {
+				for (int i = 0; i < 100000; i++) {
+					if (i % 100 == 0) {
+						System.out.printf("Refilling %d caches for the %dth time\n", nCachesRefill, i);
+					}
+
+					refillRandom(nCachesRefill);
+
+					double result = evaluateSolution();
+					if (i % 30 == 0) {
+						System.out.println(Math.floor(result));
+						loadOptimal();
+					}
+					if (result > best) {
+						best = result;
+						System.out.printf("Result for instance is now %s: ", s);
+						System.out.printf("%.0f\n", Math.floor(best));
+					}
+				}
+			}
+
+			System.out.printf("Best found: %.0f\n", bestOverall);
 			// Write output
-			writeOutput();
+			// writeOutput();
 			bw.close();
 
 			// Evaluate solution locally, if needed
 			double result = evaluateSolution();
-			System.err.printf("Result for instance %s: ", s);
-			System.err.printf("%.0f", Math.floor(result));
+			System.out.printf("Final result for instance %s: ", s);
+			System.out.printf("%.0f", Math.floor(result));
+
 		}
 
 	}
 
-	public static void refillRandom(int nRefills) {
+	public static void refillRandom(int nRefills) throws IOException {
 		// Empty and refill random cache
 		HashSet<Integer> ids = new HashSet<>();
 		ArrayList<Cache> list = new ArrayList<>();
@@ -99,11 +120,23 @@ public class main3 {
 			}
 		}
 
+		double oldValue = evaluateSolution();
+
+		// Save old configuration
+		ArrayList<Integer>[] old = new ArrayList[nServers];
+		for (Integer id : ids) {
+			old[id] = new ArrayList<>();
+			for (Video v : caches[id].vids) {
+				old[id].add(v.id);
+			}
+		}
+
 		for (Cache c : list) {
 			// Empty cache
 			emptyCache(c);
 		}
 
+		// Refill
 		for (Cache c : list) {
 			// Make list of options
 			ArrayList<Option> opts = new ArrayList<>();
@@ -113,28 +146,42 @@ public class main3 {
 				End e = ends[r.endId];
 				if (e.connect[c.id]) {
 					// Replace e.latC!! -> done
-					long curProfit = (e.curLat[r.vidId] - e.lat[c.id]) * r.nr;
+					long curProfit = Math.max((e.curLat[r.vidId] - e.lat[c.id]), 0) * r.nr;
 					profit[r.vidId] += curProfit;
 				}
 			}
 
 			for (int i = 0; i < nVideos; i++) {
+				long p = profit[i];
+				long cs = cost[i];
+				Video v = videos[i];
 				opts.add(new Option(profit[i], cost[i], videos[i]));
 			}
 
 			doKnapsack(opts, c);
+		}
+
+		// See if new config is better
+		double newValue = evaluateSolution();
+		if (newValue < oldValue) {
+			int r = ThreadLocalRandom.current().nextInt(1, 101);
+			if (r > 20) {
+				for (Cache c : list) {
+					emptyCache(c);
+					for (int id : old[c.id]) {
+						addVideo(videos[id], c);
+					}
+				}
+			}
 		}
 	}
 
 	public static void repeatSol1(int count) throws IOException {
 		// Empty caches and refill them one by one
 		System.out.printf("Repetition %d...\n", count);
-		long[] cost = new long[nVideos];
-		for (int i = 0; i < cost.length; i++) {
-			cost[i] = videos[i].size;
-		}
 		cacheCount = 0;
-
+		double prev = Math.floor(evaluateSolution());
+		
 		for (Cache c : caches) {
 			cacheCount++;
 			System.out.printf("Rep %d cache %d\n", count, cacheCount);
@@ -142,8 +189,6 @@ public class main3 {
 			ArrayList<Option> opts = new ArrayList<>();
 			long[] profit = new long[nVideos];
 
-			// Store old vids in this cache
-			HashSet<Video> oldVids = (HashSet<Video>) c.vids.clone();
 			// Empty cache
 			emptyCache(c);
 
@@ -151,7 +196,7 @@ public class main3 {
 				End e = ends[r.endId];
 				if (e.connect[c.id]) {
 					// Replace e.latC!! -> done
-					long curProfit = (e.curLat[r.vidId] - e.lat[c.id]) * r.nr;
+					long curProfit = Math.max((e.curLat[r.vidId] - e.lat[c.id]), 0) * r.nr;
 					profit[r.vidId] += curProfit;
 				}
 			}
@@ -160,32 +205,26 @@ public class main3 {
 				opts.add(new Option(profit[i], cost[i], videos[i]));
 			}
 
-			doKnapsack(opts, c);
+			doKnapsack2(opts, c);
+
+			double res = Math.floor(evaluateSolution());
+			System.out.printf("Result for instance is now: ");
+			System.out.printf("%.0f\n", Math.floor(res));
 			
-//			for (Video v : oldVids) {
-//				if (!c.vids.contains(v)) {
-//					System.out.printf("Removed video %d from cache %d\n", v.id, c.id);
-//				}
-//			}
-//			for (Video v : c.vids) {
-//				if (!oldVids.contains(v)) {
-//					System.out.printf("Added video %d to cache %d\n", v.id, c.id);
-//				}
-//			}
+			if (res != prev) {
+				break;
+			}
+			prev = res;
 		}
 	}
 
 	public static void sol1(String fileDir) throws IOException {
 		// Solution method goes here
 
-		cost = new long[nVideos];
-		for (int i = 0; i < cost.length; i++) {
-			cost[i] = videos[i].size;
-		}
-
 		for (Cache c : caches) {
 			cacheCount++;
-			System.out.printf("Doing cache %d, time elapsed %f sec\n",cacheCount, (System.nanoTime()-startTime)/1000000000);
+			System.out.printf("Doing cache %d, time elapsed %f sec\n", cacheCount,
+					(System.nanoTime() - startTime) / 1000000000);
 			// Make list of options
 			ArrayList<Option> opts = new ArrayList<>();
 			long[] profit = new long[nVideos];
@@ -194,7 +233,7 @@ public class main3 {
 				End e = ends[r.endId];
 				if (e.connect[c.id]) {
 					// Replace e.latC!! -> done
-					long curProfit = (e.curLat[r.vidId] - e.lat[c.id]) * r.nr;
+					long curProfit = Math.max((e.curLat[r.vidId] - e.lat[c.id]), 0) * r.nr;
 					profit[r.vidId] += curProfit;
 				}
 			}
@@ -204,24 +243,39 @@ public class main3 {
 			}
 
 			doKnapsack(opts, c);
+
+			double res = evaluateSolution();
+			System.out.printf("Result for instance is now: ");
+			System.out.printf("%.0f\n", Math.floor(res));
 		}
 	}
 
 	public static void doKnapsack(ArrayList<Option> opts, Cache c) {
+		Option[] arr = opts.toArray(new Option[0]);
+		Arrays.sort(arr);
+
+		for (int i = 0; i < arr.length; i++) {
+			if (c.space >= arr[i].v.size) {
+				addVideo(arr[i].v, c);
+			}
+		}
+	}
+
+	public static void doKnapsack2(ArrayList<Option> opts, Cache c) {
 		int nItems = opts.size();
-		int[] profit = new int[nItems];
+		long[] profit = new long[nItems];
 		int[] cost = new int[nItems];
 		Option[] options = new Option[nItems];
 
 		int index = 0;
 		for (Option o : opts) {
-			profit[index] = (int) o.profit;
+			profit[index] = (long) o.profit;
 			cost[index] = (int) o.cost;
 			options[index] = o;
 			index++;
 		}
 
-		int[] dp = new int[cap + 1];
+		long[] dp = new long[cap + 1];
 		int[] point = new int[cap + 1];
 		Arrays.fill(point, -1);
 		ArrayList<Integer>[] l = new ArrayList[cap + 1];
@@ -230,7 +284,6 @@ public class main3 {
 		}
 
 		for (int j = 0; j < nItems; j++) {
-
 			for (int j2 = cap; j2 >= cost[j]; j2--) {
 				if (dp[j2 - cost[j]] + profit[j] > dp[j2]) {
 					dp[j2] = dp[j2 - cost[j]] + profit[j];
@@ -241,31 +294,90 @@ public class main3 {
 		}
 
 		// Write shit
+		// long totalProfit = 0;
+		// long totalCost = 0;
 		for (int i : l[cap]) {
 			addVideo(options[i].v, c);
+			// totalProfit += options[i].profit;
+			// totalCost += options[i].cost;
+		}
+		// System.out.println(totalProfit);
+		// System.out.println(totalCost);
+		// System.out.println("stop");
+	}
+
+	public static void loadOptimal() throws IOException {
+		try {
+			BufferedReader br = new BufferedReader(new FileReader(outDir));
+			String[] split;
+			split = br.readLine().split(" ");
+
+			int nLines = Integer.parseInt(split[0]);
+
+			for (int i = 0; i < nLines; i++) {
+				split = br.readLine().split(" ");
+				int cacheId = Integer.parseInt(split[0]);
+				emptyCache(caches[cacheId]);
+				for (int j = 1; j < split.length; j++) {
+					int videoId = Integer.parseInt(split[j]);
+					addVideo(videos[videoId], caches[cacheId]);
+				}
+			}
+
+			double res = evaluateSolution();
+			System.out.printf("Loaded solution from file with value %.0f\n", Math.floor(res));
+
+		} catch (NullPointerException e) {
+			System.out.println("No old solution found, generating from scratch...");
+			sol1(outDir);
+		} catch (FileNotFoundException e) {
+			System.out.println("No old solution found, generating from scratch...");
+			sol1(outDir);
 		}
 	}
 
-	public static double evaluateSolution() {
+	public static double evaluateSolution() throws IOException {
+		// Check if solution is allowed
+		for (Cache c : caches) {
+			long space = cap;
+			for (Video v : c.vids) {
+				space -= v.size;
+			}
+			// System.out.printf("Space remaining in cache %d: %d\n", c.id,
+			// space);
+			if (space < 0) {
+				System.out.println("Invalid solution!");
+				System.out.printf("Cache %d has space %d\n", c.id, space);
+				System.exit(0);
+			}
+		}
+
 		// Client-side evaluation of solution
 		long total = 0;
 		long totalReqs = 0;
-		
+
 		for (Request r : reqs) {
 			End e = ends[r.endId];
 			totalReqs += r.nr;
 			long lowestLat = e.latC;
-			for (Cache c : caches) {
-				if (e.connect[c.id] && c.vids.contains(videos[r.vidId])) {
-					lowestLat = Math.min(lowestLat, e.lat[c.id]);
-				}
-			}
-			
+			// for (Cache c : caches) {
+			// if (e.connect[c.id] && c.vids.contains(videos[r.vidId])) {
+			// lowestLat = Math.min(lowestLat, e.lat[c.id]);
+			// }
+			// }
+			lowestLat = Math.min(lowestLat, e.curLat[r.vidId]);
+
 			long saved = (e.latC - lowestLat) * r.nr;
 			total += saved;
 		}
-		
-		return ((double)total * 1000) / (double)totalReqs;
+
+		double result = ((double) total * 1000) / (double) totalReqs;
+		if (result > bestOverall) {
+			System.out.printf("New overall optimum: %.0f\n", Math.floor(result));
+			bestOverall = result;
+			writeOutput();
+		}
+		return result;
 	}
 
 	public static void readInput(String fileDir) throws IOException {
@@ -327,6 +439,11 @@ public class main3 {
 		// Pairs
 		pairs = new Pair[nVideos][nEnds];
 
+		cost = new long[nVideos];
+		for (int i = 0; i < cost.length; i++) {
+			cost[i] = videos[i].size;
+		}
+
 		br.close();
 	}
 
@@ -349,7 +466,7 @@ public class main3 {
 			if (e.curCache[v.id] == c.id) {
 				// Was using this cache, find next closest
 				int id = -1;
-				int lat = Integer.MAX_VALUE;
+				int lat = e.latC;
 				for (Cache c2 : caches) {
 					if (e.connect[c2.id] && c2.vids.contains(v) && e.lat[c2.id] < lat) {
 						lat = e.lat[c2.id];
@@ -375,6 +492,10 @@ public class main3 {
 	}
 
 	public static void writeOutput() throws IOException {
+		initWriter(outDir);
+		bw.close();
+		initWriter(outDir);
+
 		int nLines = 0;
 		for (int i = 0; i < nServers; i++) {
 			if (!caches[i].vids.isEmpty()) {
@@ -405,7 +526,7 @@ public class main3 {
 
 	public static void filePrepend(String line, String fileDir) throws IOException {
 		bw.flush();
-		String tempDir = "C:\\Users\\Erik\\git\\hashcode2017\\data\\temp";
+		String tempDir = "/home/erik/git/hashcode2017/data/temp";
 		Files.copy(Paths.get(fileDir), Paths.get(tempDir), StandardCopyOption.REPLACE_EXISTING);
 		initWriter(fileDir);
 		bw.write(line);
@@ -416,7 +537,7 @@ public class main3 {
 			bw.write("\n");
 		}
 		br.close();
-		bw.close();
+		bw.flush();
 	}
 
 	public static void initWriter(String fileDir) throws UnsupportedEncodingException, FileNotFoundException {
