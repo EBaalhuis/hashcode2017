@@ -20,10 +20,9 @@ import java.util.concurrent.ThreadLocalRandom;
 public class main3 {
 
 	// Input instances
-	// public static String[] instances = { "videos_worth_spreading", "kittens",
-	// "me_at_the_zoo", "trending_today" };
+//	 public static String[] instances = { "videos_worth_spreading", "kittens", "me_at_the_zoo", "trending_today" };
 	// public static String[] instances = { "" };
-	public static String[] instances = { "me_at_the_zoo" };
+	public static String[] instances = { "kittens" };
 
 	// variables that are read from input
 	public static long nRow, nCol, deadline, maxLoad, totalScore;
@@ -39,6 +38,7 @@ public class main3 {
 	public static long[] cost;
 	public static double startTime;
 	public static double bestOverall = 0;
+	public static String tempDir = "C:\\Users\\Erik\\git\\hashcode2017\\data\\temp";
 
 	// variables for making output
 	public static BufferedWriter bw;
@@ -46,8 +46,8 @@ public class main3 {
 	public static void main(String[] args) throws IOException {
 		startTime = System.nanoTime();
 		for (String s : instances) {
-			String inputDir = "/home/erik/git/hashcode2017/data/" + s + ".in";
-			outDir = "/home/erik/git/hashcode2017/data/" + s + ".out";
+			String inputDir = "C:\\Users\\Erik\\git\\hashcode2017\\data\\" + s + ".in";
+			outDir = "C:\\Users\\Erik\\git\\hashcode2017\\src\\" + s + ".out";
 			readInput(inputDir);
 
 			// Solution method here
@@ -60,32 +60,32 @@ public class main3 {
 			double cur = 0;
 			double updated = 1;
 			int count = 0;
-			while (cur != updated) {
-				count++;
-				cur = evaluateSolution();
-				repeatSol1(count);
-				double res = evaluateSolution();
-				System.out.printf("Result for instance is now %s: ", s);
-				System.out.printf("%.0f\n", Math.floor(res));
-				updated = evaluateSolution();
-			}
+//			while (cur != updated) {
+//				count++;
+//				cur = evaluateSolution();
+//				repeatSol1(count);
+//				double res = evaluateSolution();
+//				System.out.printf("Result for instance is now %s: ", s);
+//				System.out.printf("%.0f\n", Math.floor(res));
+//				updated = evaluateSolution();
+//			}
 
 			// Do random refills
 			double best = 0;
 
 			for (int nCachesRefill = 2; nCachesRefill < 10; nCachesRefill++) {
 				for (int i = 0; i < 100000; i++) {
-					if (i % 100 == 0) {
+					if (i % 5 == 0) {
 						System.out.printf("Refilling %d caches for the %dth time\n", nCachesRefill, i);
 					}
 
 					refillRandom(nCachesRefill);
 
 					double result = evaluateSolution();
-					if (i % 30 == 0) {
-						System.out.println(Math.floor(result));
-						loadOptimal();
-					}
+//					if (i % 30 == 0) {
+//						System.out.println(Math.floor(result));
+//						loadOptimal();
+//					}
 					if (result > best) {
 						best = result;
 						System.out.printf("Result for instance is now %s: ", s);
@@ -102,7 +102,7 @@ public class main3 {
 			// Evaluate solution locally, if needed
 			double result = evaluateSolution();
 			System.out.printf("Final result for instance %s: ", s);
-			System.out.printf("%.0f", Math.floor(result));
+			System.out.printf("%.0f\n", Math.floor(result));
 
 		}
 
@@ -211,9 +211,9 @@ public class main3 {
 			System.out.printf("Result for instance is now: ");
 			System.out.printf("%.0f\n", Math.floor(res));
 			
-			if (res != prev) {
-				break;
-			}
+//			if (res != prev) {
+//				break;
+//			}
 			prev = res;
 		}
 	}
@@ -371,7 +371,7 @@ public class main3 {
 			total += saved;
 		}
 
-		double result = ((double) total * 1000) / (double) totalReqs;
+		double result = Math.floor(((double) total * 1000) / (double) totalReqs);
 		if (result > bestOverall) {
 			System.out.printf("New overall optimum: %.0f\n", Math.floor(result));
 			bestOverall = result;
@@ -526,7 +526,6 @@ public class main3 {
 
 	public static void filePrepend(String line, String fileDir) throws IOException {
 		bw.flush();
-		String tempDir = "/home/erik/git/hashcode2017/data/temp";
 		Files.copy(Paths.get(fileDir), Paths.get(tempDir), StandardCopyOption.REPLACE_EXISTING);
 		initWriter(fileDir);
 		bw.write(line);
